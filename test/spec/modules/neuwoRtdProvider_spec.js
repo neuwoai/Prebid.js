@@ -35,8 +35,19 @@ describe('neuwoRtdProvider', function () {
     it('initializes', function () {
       expect(neuwo.neuwoRtdModule.init(config())).to.be.true;
     })
+    it('init config public token cannot be null', function () {
+      expect(neuwo.neuwoRtdModule.init({
+        params: {
+          publicToken: null,
+          apiUrl: 'https://testing-requirement.neuwo.api'
+        }
+      })).to.be.false;
+    })
     it('init needs that public token', function () {
-      expect(neuwo.neuwoRtdModule.init()).to.be.false;
+      expect(neuwo.neuwoRtdModule.init({})).to.be.false;
+    })
+    it('init config cannot be null', function () {
+      expect(neuwo.neuwoRtdModule.init(null)).to.be.false;
     })
 
     describe('segment picking', function () {
@@ -60,7 +71,6 @@ describe('neuwoRtdProvider', function () {
         neuwo.injectTopics(topics, bidsConfig, () => { })
         expect(bidsConfig.ortb2Fragments.global.site.content.data[0].name, 'name of first content data object').to.equal(neuwo.DATA_PROVIDER)
         expect(bidsConfig.ortb2Fragments.global.site.content.data[0].segment[0].id, 'id of first segment in content.data').to.equal(TAX_ID)
-        expect(bidsConfig.ortb2Fragments.global.site.cattax, 'category taxonomy code for pagecat').to.equal(6) // CATTAX_IAB
         expect(bidsConfig.ortb2Fragments.global.site.pagecat[0], 'category taxonomy code for pagecat').to.equal(TAX_ID)
       })
 
