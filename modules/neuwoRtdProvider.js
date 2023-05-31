@@ -43,13 +43,10 @@ export function getBidRequestData(reqBidsConfigObj, callback, config, userConsen
     logInfo('NeuwoRTDModule', 'GetAiTopics: response', responseContent)
     try {
       const jsonContent = JSON.parse(responseContent);
-      if (jsonContent.marketing_categories) {
+      if (jsonContent.marketing_categories || jsonContent.tags) {
         events.emit(CONSTANTS.EVENTS.BILLABLE_EVENT, { type: 'request', billingId, vendor: neuwoRtdModule.name })
       }
       injectIABs(jsonContent, reqBidsConfigObj, billingId)
-      if (jsonContent.tags) {
-        events.emit(CONSTANTS.EVENTS.BILLABLE_EVENT, { type: 'request', billingId, vendor: neuwoRtdModule.name })
-      }
       injectNeuwoTags(jsonContent, reqBidsConfigObj, billingId)
     } catch (ex) {
       logError('NeuwoRTDModule', 'Response to JSON parse error', ex)
@@ -106,7 +103,6 @@ export function injectNeuwoTags(response, bidsConfig) {
   }
 
   addFragment(bidsConfig.ortb2Fragments.global, 'site.content.data', [NeuwoTags])
-
   logInfo('NeuwoRTDModule', 'injectNeuwoTags: post-injection bidsConfig', bidsConfig)
 }
 
