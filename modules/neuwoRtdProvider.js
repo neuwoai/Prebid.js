@@ -9,6 +9,8 @@ export const DATA_PROVIDER = 'neuwo.ai';
 const SEGTAX_IAB = 6 // IAB - Content Taxonomy version 2
 const RESPONSE_IAB_TIER_1 = 'marketing_categories.iab_tier_1'
 const RESPONSE_IAB_TIER_2 = 'marketing_categories.iab_tier_2'
+const NEUWO_TAGS = 900 // Neuwo tags
+const RESPONSE_TAGS = 'tags'
 
 function init(config = {}, userConsent) {
   config.params = config.params || {}
@@ -91,21 +93,34 @@ export function injectTopics(topics, bidsConfig) {
     combineArray([], topics, RESPONSE_IAB_TIER_1),
     topics, RESPONSE_IAB_TIER_2)
 
-  const segment = pickSegments(combinedTiers)
+  const iabSegment = pickIABSegments(combinedTiers)
   // effectively gets topics.marketing_categories.iab_tier_1, topics.marketing_categories.iab_tier_2
   // used as FPD segments content
 
   const IABSegments = {
     name: DATA_PROVIDER,
     ext: { segtax: SEGTAX_IAB },
-    segment
+    iabSegment
   }
 
-  addFragment(bidsConfig.ortb2Fragments.global, 'site.content.data', [IABSegments])
+  const allTags = combineArray(
+    [], topics, RESPONSE_TAGS)
+
+  const tagSegment = pickTagSegments(allTags)
+  // Gets topics.tags
+  // used as FPD segments content
+
+  const NeuwoTags = {
+    name: DATA_PROVIDER,
+    ext: { segtax: NEUWO_TAGS },
+    tagSegment
+  }
+
+  addFragment(bidsConfig.ortb2Fragments.global, 'site.content.data', [IABSegments, NeuwoTags])
 
   // upgrade category taxonomy to IAB 2.2, inject result to page categories
-  if (segment.length > 0) {
-    addFragment(bidsConfig.ortb2Fragments.global, 'site.pagecat', segment.map(s => s.id))
+  if (iabSegment.length > 0) {
+    addFragment(bidsConfig.ortb2Fragments.global, 'site.pagecat', iabSegment.map(s => s.id))
   }
 
   logInfo('NeuwoRTDModule', 'injectTopics: post-injection bidsConfig', bidsConfig)
@@ -155,14 +170,24 @@ export function convertSegment(segment) {
 }
 
 /**
- * map array of objects to segments
+ * map array of objects to IAB segments
  * @param {Array[{ID: string}]} normalizable
  * @returns array of IAB "segments"
  */
-export function pickSegments(normalizable) {
+export function pickIABSegments(normalizable) {
   if (Array.isArray(normalizable) === false) return []
   return normalizable.map(convertSegment)
     .filter(t => t.id)
+}
+
+/**
+ * map array of objects to tagSegments
+ * @param {Array[{URI: string}]} normalizable
+ * @returns array of tag "segments"
+ */
+export function pickTagSegments(normalizable) {
+  if (Array.isArray(normalizable) === false) return []
+  return normalizable.map((item) => { id: item.URI })
 }
 
 export const neuwoRtdModule = {
