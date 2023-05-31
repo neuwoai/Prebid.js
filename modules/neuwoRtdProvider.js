@@ -46,7 +46,11 @@ export function getBidRequestData(reqBidsConfigObj, callback, config, userConsen
       if (jsonContent.marketing_categories) {
         events.emit(CONSTANTS.EVENTS.BILLABLE_EVENT, { type: 'request', billingId, vendor: neuwoRtdModule.name })
       }
-      injectTopics(jsonContent, reqBidsConfigObj, billingId)
+      injectIABs(jsonContent, reqBidsConfigObj, billingId)
+      if (jsonContent.tags) {
+        events.emit(CONSTANTS.EVENTS.BILLABLE_EVENT, { type: 'request', billingId, vendor: neuwoRtdModule.name })
+      }
+      injectNeuwoTags(jsonContent, reqBidsConfigObj, billingId)
     } catch (ex) {
       logError('NeuwoRTDModule', 'Response to JSON parse error', ex)
     }
@@ -85,45 +89,52 @@ function combineArray(base, source, key) {
   else return base
 }
 
-export function injectTopics(topics, bidsConfig) {
-  topics = topics || {}
-
-  // join arrays of IAB category details to single array
-  const combinedTiers = combineArray(
-    combineArray([], topics, RESPONSE_IAB_TIER_1),
-    topics, RESPONSE_IAB_TIER_2)
-
-  const iabSegment = pickIABSegments(combinedTiers)
-  // effectively gets topics.marketing_categories.iab_tier_1, topics.marketing_categories.iab_tier_2
-  // used as FPD segments content
-
-  const IABSegments = {
-    name: DATA_PROVIDER,
-    ext: { segtax: SEGTAX_IAB },
-    iabSegment
-  }
+export function injectNeuwoTags(response, bidsConfig) {
+  response = response || {}
 
   const allTags = combineArray(
-    [], topics, RESPONSE_TAGS)
+    [], response, RESPONSE_TAGS)
 
-  const tagSegment = pickTagSegments(allTags)
-  // Gets topics.tags
+  const segment = pickTagSegments(allTags)
+  // Gets response.tags
   // used as FPD segments content
 
   const NeuwoTags = {
     name: DATA_PROVIDER,
     ext: { segtax: NEUWO_TAGS },
-    tagSegment
+    segment
   }
 
-  addFragment(bidsConfig.ortb2Fragments.global, 'site.content.data', [IABSegments, NeuwoTags])
+  addFragment(bidsConfig.ortb2Fragments.global, 'site.content.data', [NeuwoTags])
 
+  logInfo('NeuwoRTDModule', 'injectNeuwoTags: post-injection bidsConfig', bidsConfig)
+}
+
+export function injectIABs(response, bidsConfig) {
+  response = response || {}
+
+  // join arrays of IAB category details to single array
+  const combinedTiers = combineArray(
+    combineArray([], response, RESPONSE_IAB_TIER_1),
+    response, RESPONSE_IAB_TIER_2)
+
+  const segment = pickIABSegments(combinedTiers)
+  // effectively gets response.marketing_categories.iab_tier_1, response.marketing_categories.iab_tier_2
+  // used as FPD segments content
+
+  const IABSegments = {
+    name: DATA_PROVIDER,
+    ext: { segtax: SEGTAX_IAB },
+    segment
+  }
   // upgrade category taxonomy to IAB 2.2, inject result to page categories
-  if (iabSegment.length > 0) {
-    addFragment(bidsConfig.ortb2Fragments.global, 'site.pagecat', iabSegment.map(s => s.id))
+  if (segment.length > 0) {
+    addFragment(bidsConfig.ortb2Fragments.global, 'site.pagecat', segment.map(s => s.id))
   }
 
-  logInfo('NeuwoRTDModule', 'injectTopics: post-injection bidsConfig', bidsConfig)
+  addFragment(bidsConfig.ortb2Fragments.global, 'site.content.data', [IABSegments])
+
+  logInfo('NeuwoRTDModule', 'injectIABs: post-injection bidsConfig', bidsConfig)
 }
 
 /* eslint-disable object-property-newline */
@@ -162,7 +173,7 @@ const D_IAB_ID = { // Content Taxonomy version 2.0 final release November 2017 [
   'IAB23-10': '453', 'IAB7-34': '301', 'IAB4-8': '395', 'IAB26-3': '608', 'IAB20-25': '151', 'IAB20-27': '659'
 }
 
-export function convertSegment(segment) {
+export function convertIAB(segment) {
   if (!segment) return {}
   return {
     id: D_IAB_ID[segment.id || segment.ID]
@@ -176,8 +187,15 @@ export function convertSegment(segment) {
  */
 export function pickIABSegments(normalizable) {
   if (Array.isArray(normalizable) === false) return []
-  return normalizable.map(convertSegment)
+  return normalizable.map(convertIAB)
     .filter(t => t.id)
+}
+
+export function convertTag(tag) {
+  if (!tag) return {}
+  return {
+    id: tag.URI
+  }
 }
 
 /**
@@ -187,7 +205,8 @@ export function pickIABSegments(normalizable) {
  */
 export function pickTagSegments(normalizable) {
   if (Array.isArray(normalizable) === false) return []
-  return normalizable.map((item) => { id: item.URI })
+  return normalizable.map(convertTag)
+    .filter(t => t.id)
 }
 
 export const neuwoRtdModule = {

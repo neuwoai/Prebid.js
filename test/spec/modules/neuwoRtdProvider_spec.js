@@ -15,10 +15,16 @@ const apiReturns = () => ({
     iab_tier_1: [
       { ID: 'IAB21', label: 'Real Estate', relevance: '0.45699' }
     ]
-  }
+  },
+  tags: [
+    { URI: '<https://tags.neuwo.ai/masterID3841>',
+      value: 'Streaming Media',
+      score: '0.51092' },
+  ]
 })
 
 const TAX_ID = '441'
+const TAG_ID = '<https://tags.neuwo.ai/masterID3841>'
 
 /**
  * Object generator, like above, written using alternative techniques
@@ -39,48 +45,92 @@ describe('neuwoRtdProvider', function () {
       expect(neuwo.neuwoRtdModule.init()).to.be.false;
     })
 
-    describe('segment picking', function () {
+    describe('iab segment picking', function () {
       it('handles bad inputs', function () {
-        expect(neuwo.pickSegments()).to.be.an('array').that.is.empty;
-        expect(neuwo.pickSegments('technically also an array')).to.be.an('array').that.is.empty;
-        expect(neuwo.pickSegments({ bad_object: 'bad' })).to.be.an('array').that.is.empty;
+        expect(neuwo.pickIABSegments()).to.be.an('array').that.is.empty;
+        expect(neuwo.pickIABSegments('technically also an array')).to.be.an('array').that.is.empty;
+        expect(neuwo.pickIABSegments({ bad_object: 'bad' })).to.be.an('array').that.is.empty;
       })
       it('handles malformations', function () {
-        let result = neuwo.pickSegments([{something_wrong: true}, null, { ID: 'IAB19-20' }, { id: 'IAB3-1', ID: 'IAB9-20' }])
+        let result = neuwo.pickIABSegments([{something_wrong: true}, null, { ID: 'IAB19-20' }, { id: 'IAB3-1', ID: 'IAB9-20' }])
         expect(result[0].id).to.equal('631')
         expect(result[1].id).to.equal('58')
         expect(result.length).to.equal(2)
       })
     })
 
-    describe('topic injection', function () {
+    describe('IAB injection', function () {
       it('mutates bidsConfig', function () {
-        let topics = apiReturns()
+        let response = apiReturns()
         let bidsConfig = bidsConfiglike()
-        neuwo.injectTopics(topics, bidsConfig, () => { })
+        neuwo.injectIABs(response, bidsConfig, () => { })
         expect(bidsConfig.ortb2Fragments.global.site.content.data[0].name, 'name of first content data object').to.equal(neuwo.DATA_PROVIDER)
         expect(bidsConfig.ortb2Fragments.global.site.content.data[0].segment[0].id, 'id of first segment in content.data').to.equal(TAX_ID)
         expect(bidsConfig.ortb2Fragments.global.site.pagecat[0], 'category taxonomy code for pagecat').to.equal(TAX_ID)
       })
 
       it('handles malformed responses', function () {
-        let topics = { message: 'Forbidden' }
+        let response = { message: 'Forbidden' }
         let bidsConfig = bidsConfiglike()
-        neuwo.injectTopics(topics, bidsConfig, () => { })
+        neuwo.injectIABs(response, bidsConfig, () => { })
         expect(bidsConfig.ortb2Fragments.global.site.content.data[0].name, 'name of first content data object').to.equal(neuwo.DATA_PROVIDER)
         expect(bidsConfig.ortb2Fragments.global.site.content.data[0].segment, 'length of segment(s) in content.data').to.be.an('array').that.is.empty;
 
-        topics = '404 wouldn\'t really even show up for injection'
+        response = '404 wouldn\'t really even show up for injection'
         let bdsConfig = bidsConfiglike()
-        neuwo.injectTopics(topics, bdsConfig, () => { })
+        neuwo.injectIABs(response, bdsConfig, () => { })
         expect(bdsConfig.ortb2Fragments.global.site.content.data[0].name, 'name of first content data object').to.equal(neuwo.DATA_PROVIDER)
         expect(bdsConfig.ortb2Fragments.global.site.content.data[0].segment, 'length of segment(s) in content.data').to.be.an('array').that.is.empty;
 
-        topics = undefined
+        response = undefined
         let bdsConfigE = bidsConfiglike()
-        neuwo.injectTopics(topics, bdsConfigE, () => { })
+        neuwo.injectIABs(response, bdsConfigE, () => { })
         expect(bdsConfigE.ortb2Fragments.global.site.content.data[0].name, 'name of first content data object').to.equal(neuwo.DATA_PROVIDER)
         expect(bdsConfigE.ortb2Fragments.global.site.content.data[0].segment, 'length of segment(s) in content.data').to.be.an('array').that.is.empty;
+      })
+    })
+
+    describe('tag segment picking', function () {
+      it('handles bad inputs', function () {
+        expect(neuwo.pickTagSegments()).to.be.an('array').that.is.empty;
+        expect(neuwo.pickTagSegments('technically also an array')).to.be.an('array').that.is.empty;
+        expect(neuwo.pickTagSegments({ bad_object: 'bad' })).to.be.an('array').that.is.empty;
+      })
+      it('handles malformations', function () {
+        let result = neuwo.pickTagSegments([{something_wrong: true}, null, { URI: '<https://tags.neuwo.ai/masterID101817>' }, { URI: '<https://tags.neuwo.ai/masterID104264>' }])
+        expect(result[0].id).to.equal('<https://tags.neuwo.ai/masterID101817>')
+        expect(result[1].id).to.equal('<https://tags.neuwo.ai/masterID104264>')
+        expect(result.length).to.equal(2)
+      })
+    })
+
+    describe('Neuwo tag injection', function () {
+      it('mutates bidsConfig', function () {
+        let response = apiReturns()
+        let bidsConfig = bidsConfiglike()
+        neuwo.injectNeuwoTags(response, bidsConfig, () => { })
+        expect(bidsConfig.ortb2Fragments.global.site.content.data[1].name, 'name of first content data object').to.equal(neuwo.DATA_PROVIDER)
+        expect(bidsConfig.ortb2Fragments.global.site.content.data[1].segment[0].id, 'id of first tag in content.data\'s tagSegment').to.equal(TAG_ID)
+      })
+
+      it('handles malformed responses', function () {
+        let response = { message: 'Forbidden' }
+        let bidsConfig = bidsConfiglike()
+        neuwo.injectNeuwoTags(response, bidsConfig, () => { })
+        expect(bidsConfig.ortb2Fragments.global.site.content.data[1].name, 'name of first content data object').to.equal(neuwo.DATA_PROVIDER)
+        expect(bidsConfig.ortb2Fragments.global.site.content.data[1].segment, 'length of segment(s) in content.data').to.be.an('array').that.is.empty;
+
+        response = '404 wouldn\'t really even show up for injection'
+        let bdsConfig = bidsConfiglike()
+        neuwo.injectNeuwoTags(response, bdsConfig, () => { })
+        expect(bdsConfig.ortb2Fragments.global.site.content.data[1].name, 'name of first content data object').to.equal(neuwo.DATA_PROVIDER)
+        expect(bdsConfig.ortb2Fragments.global.site.content.data[1].segment, 'length of segment(s) in content.data').to.be.an('array').that.is.empty;
+
+        response = undefined
+        let bdsConfigE = bidsConfiglike()
+        neuwo.injectNeuwoTags(response, bdsConfigE, () => { })
+        expect(bdsConfigE.ortb2Fragments.global.site.content.data[1].name, 'name of first content data object').to.equal(neuwo.DATA_PROVIDER)
+        expect(bdsConfigE.ortb2Fragments.global.site.content.data[1].segment, 'length of segment(s) in content.data').to.be.an('array').that.is.empty;
       })
     })
 
